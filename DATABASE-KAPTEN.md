@@ -1,18 +1,49 @@
-# Tabel validasi kapten
+# Tabel yang harus dibuat
 
 Aplikasi ini **membaca** schema `pl` milik pipeline dan **menulis** satu hal
-saja: penilaian kapten setelah ia sampai di area yang direkomendasikan.
+saja: catatan kapten di lapangan.
 
-Tulisan itu ditaruh di schema terpisah bernama `kapten`. Tidak ada satu pun
-tabel `pl` yang disentuh — tidak dibaca-tulis, tidak di-ALTER, tidak di-DROP.
-Kalau ternyata salah rancang, `DROP SCHEMA kapten CASCADE` mengembalikan basis
-data persis seperti semula.
+Catatan itu butuh satu tabel baru. Selama tabelnya belum ada, aplikasi tetap
+berjalan — tombolnya bisa ditekan dan jawabannya disimpan di perangkat kapten,
+lalu dikirim begitu tabelnya tersedia. Jadi tidak ada catatan yang hilang
+selama masa tunggu, tetapi juga tidak ada satu pun yang sampai ke pusat sampai
+DDL di bawah dijalankan.
 
-Berkas ini adalah spesifikasi untuk dijalankan oleh pemegang akses basis data.
-**Aplikasi tidak pernah membuat schema atau tabel sendiri.** Selama tabelnya
-belum ada, tombol validasi tetap bisa ditekan dan jawabannya disimpan di
-perangkat kapten, lalu dikirim begitu tabelnya tersedia — jadi tidak ada
-jawaban yang hilang selama masa tunggu.
+**Aplikasi tidak pernah membuat schema atau tabelnya sendiri.** Itu basis data
+produksi milik pipeline, dan DDL diam-diam dari sebuah aplikasi web adalah cara
+paling rapi untuk merusak sesuatu yang bukan miliknya.
+
+## Yang disimpan tiap catatan
+
+Tiga hal inti, dan ketiganya harus ada bersama-sama supaya catatannya berguna:
+
+| | Kolom | Kenapa |
+|---|---|---|
+| **Lokasi** | `lat`, `lon` | Koordinat GPS tempat kapten benar-benar berada — bukan pusat petak. Kapal tidak berhenti tepat di tengah heksagon. |
+| **Waktu** | `tiba_pada`, `dibuat_pada` | `tiba_pada` = saat kapten di lokasi; `dibuat_pada` = saat baris masuk basis data. Keduanya berbeda saat catatan dibuat offline lalu dikirim belakangan. |
+| **Zona heksagon** | `cell_key`, `cell_level` | Petak tempat koordinat itu jatuh. `coarse` = heksagon besar (±2.360 km²), `fine` = petak 2 km. Inilah yang menyambungkan catatan kapten ke perkiraan model. |
+
+Di sekitar ketiganya ada tiga kelompok pendukung:
+
+- **Potret model** (`run_id`, `skor_model`, `kelas_model`, `risiko_model`) —
+  apa yang model klaim di petak itu **pada saat catatan dibuat**. Tanpa potret
+  ini, run berikutnya menimpa skornya dan tidak ada lagi cara tahu angka
+  berapa yang sebenarnya diuji.
+- **Penilaian kapten** (`setuju`, `hasil`, `tangkapan_kg`, `jenis_ikan`,
+  `catatan`) — temuan di lapangan.
+- **Keadaan pencatatan** (`mode`, `posisi_cocok`, `jarak_ke_petak_km`,
+  `kapal`, `perangkat`) — dari mana catatan itu datang dan seberapa bisa
+  dipercaya posisinya.
+
+### Lokasi disimpan dua kali, dan itu disengaja
+
+`lat`/`lon` adalah titik kapten; `cell_key` adalah petak tempat titik itu
+jatuh. Keduanya disimpan karena menjawab pertanyaan berbeda: koordinat
+menjawab "di mana persisnya ikan itu ada", `cell_key` menjawab "model menduga
+apa di sana". Menyimpan salah satunya saja membuang separuh gunanya.
+
+Selisih keduanya juga data: `jarak_ke_petak_km` memberi tahu seberapa jauh
+kapten dari pusat petak yang ia nilai.
 
 ## DDL
 
@@ -195,3 +226,35 @@ SELECT mode,
   FROM kapten.validasi
  GROUP BY mode ORDER BY n DESC;
 ```
+
+## Memastikan aplikasi dan tabel tetap sama
+
+Kalau DDL di atas diubah, yang menulis juga harus ikut berubah. Dua tempat:
+
+| Yang diubah | Berkas |
+|---|---|
+| Daftar kolom & urutannya | `src/lib/kapten.ts` → `simpanValidasi()` |
+| Penyaringan nilai dari badan permintaan | `src/app/api/validasi/route.ts` |
+
+Pemeriksaan cepat bahwa keduanya masih cocok:
+
+```bash
+# Bandingkan kolom di DDL dengan kolom di INSERT aplikasi.
+# Keluaran yang diharapkan: kedua daftar identik dan jumlahnya sama.
+sed -n '/CREATE TABLE IF NOT EXISTS kapten.validasi/,/^);/p' DATABASE-KAPTEN.md \
+  | grep -oE '^  [a-z_]+' | tr -d ' ' | grep -vE '^(id|dibuat_pada)$' | sort > /tmp/ddl.txt
+
+sed -n '/INSERT INTO kapten.validasi/,/VALUES/p' src/lib/kapten.ts \
+  | tr ',' '\n' | grep -oE '[a-z_]+' | grep -vE '^(INSERT|INTO|kapten|validasi|VALUES)$' | sort > /tmp/app.txt
+
+diff /tmp/ddl.txt /tmp/app.txt && echo "COCOK" || echo "BERBEDA — perbaiki sebelum deploy"
+```
+
+Per commit terakhir: **21 kolom wajib diisi, urutan DDL dan INSERT identik,
+21 placeholder, 21 nilai dikirim.**
+
+Satu hal yang perlu diperhatikan saat menambah kolom: aplikasi menyimpan
+catatan di perangkat kapten sebelum mengirimnya. Catatan yang sudah mengantre
+dibuat dengan bentuk muatan LAMA, jadi kolom baru harus boleh `NULL` —
+kalau tidak, catatan yang dibuat sebelum perubahan akan ditolak selamanya saat
+antreannya dicoba kirim ulang.
