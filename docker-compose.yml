@@ -1,0 +1,19 @@
+services:
+  laut-kapal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_MAP_STYLE_URL: ${NEXT_PUBLIC_MAP_STYLE_URL}
+    image: laut-kapal:local
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "3101:3000"

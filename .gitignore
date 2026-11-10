@@ -1,0 +1,41 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# misc
+.DS_Store
+*.pem
+.env
+.env*.local
+.env.docker
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# local tooling
+/.claude/
+
+# arsip harvester — hasil tarikan, bisa dibuat ulang kapan saja.
+# Hapus baris ini bila arsip seminggu memang ingin ikut di-commit
+# (perkiraan ukurannya ~16 MB).
+/data/
+
+# backfill seminggu ke belakang (harvester/backfill.py) — puluhan MB dan bisa
+# ditarik ulang kapan saja. `data_terkini/` sengaja TIDAK diabaikan: ia potret
+# 1,7 MB yang memang dimaksudkan ikut di repo.
+/data_seminggu/
+__pycache__/
+
+# netlify
+/.netlify/
+
+# venv khusus CMEMS (dibuat ulang dari requirements-cmems.txt)
+harvester/.venv-cmems/
+public/model-output/
+
+# Arsip zip manual — 114 MB, melewati batas 100 MB/file GitHub
+Archive.zip

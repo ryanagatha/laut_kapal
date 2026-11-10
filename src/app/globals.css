@@ -1,0 +1,148 @@
+/* Tipografi mengikuti laut-statis: Plus Jakarta Sans, dengan DM Sans sebagai
+   padanan terdekat. Dimuat dengan `display=swap` supaya teks pertama muncul
+   tanpa menunggu unduhan — aplikasi ini dibuka di geladak dengan sinyal
+   seadanya, dan layar kosong selama menunggu font adalah ongkos yang tidak
+   sebanding. */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Palet laut-statis */
+    --navy: #002147;
+    --indigo: #2e3192;
+    --indigo-terang: #3d40a6;
+    /* Warna kuadran — sama persis dengan QUADRANTS di pipeline, supaya satu
+       warna berarti hal yang sama di kedua aplikasi. */
+    --utama: #16a34a;
+    --ekspedisi: #2e3192;
+    --cadangan: #eab308;
+    --hindari: #ef4444;
+
+    --aman-bawah: env(safe-area-inset-bottom, 0px);
+    --aman-atas: env(safe-area-inset-top, 0px);
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', 'DM Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: #1a1a1a;
+    background: #eef2f6;
+    /* Angka rata lebar: jarak dan skor berubah terus saat GPS bergerak, dan
+       digit yang melompat-lompat membuat panel terlihat gelisah. */
+    font-variant-numeric: tabular-nums;
+  }
+
+  h1, h2, h3 {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+  }
+
+  input, textarea, select {
+    font: inherit;
+    /* 16px minimum: di Safari iOS, input di bawah 16px memaksa halaman
+       di-zoom saat difokuskan, dan peta ikut terlempar. */
+    font-size: max(16px, 1em);
+  }
+}
+
+@layer components {
+  /* Sudut terpancung — tanda visual laut-statis. `corner-shape: bevel` masih
+     baru, jadi clip-path dipakai sebagai cadangan agar bentuknya sama di
+     peramban ponsel yang belum mendukungnya. */
+  .box-cut {
+    border-radius: 0;
+  }
+  @supports (corner-shape: bevel) {
+    .box-cut {
+      corner-shape: bevel;
+      border-radius: 13px;
+    }
+  }
+  @supports not (corner-shape: bevel) {
+    .box-cut {
+      clip-path: polygon(
+        13px 0, calc(100% - 13px) 0, 100% 13px,
+        100% calc(100% - 13px), calc(100% - 13px) 100%,
+        13px 100%, 0 calc(100% - 13px), 0 13px
+      );
+    }
+  }
+
+  .kaca {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.82) 0%,
+      rgba(255, 255, 255, 0.66) 100%
+    );
+    backdrop-filter: saturate(140%) blur(20px);
+    -webkit-backdrop-filter: saturate(140%) blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Sasaran sentuh minimum 44 px — ukuran jari menurut panduan Apple. Di
+     kapal yang bergoyang, sasaran lebih kecil sering meleset. */
+  .sentuh {
+    min-height: 44px;
+  }
+
+  .gagang {
+    width: 38px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(0, 33, 71, 0.22);
+  }
+
+  .tekan {
+    transition: transform 0.12s ease, opacity 0.12s ease;
+  }
+  .tekan:active {
+    transform: scale(0.975);
+    opacity: 0.88;
+  }
+}
+
+@layer utilities {
+  .sembunyi-gulir {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .sembunyi-gulir::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Atribusi peta dikecilkan, tidak dihapus: menghilangkannya melanggar syarat
+   pemakaian OpenStreetMap dan MapTiler. */
+.maplibregl-ctrl-attrib {
+  font-size: 9px;
+  background: rgba(255, 255, 255, 0.6) !important;
+}
+.maplibregl-ctrl-bottom-left {
+  display: none;
+}
