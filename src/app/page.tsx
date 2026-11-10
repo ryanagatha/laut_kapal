@@ -106,6 +106,15 @@ export default function Aplikasi() {
    * kelasnya — label tidak bisa lagi berubah setelah kapten mulai mengisi.
    */
   const [modeNilai, setModeNilai] = useState<Mode>('rekomendasi')
+  /**
+   * Apakah catatan manual yang sedang diisi berasal dari pin di peta.
+   *
+   * Dipotret saat pencatatan dimulai, bukan dibaca dari `pin` saat kirim:
+   * lembar penilaian tidak menutupi seluruh peta, jadi kapten masih bisa
+   * menggeser pin sesudahnya — dan koordinat yang tercatat akan berbeda dari
+   * penanda yang menyertainya.
+   */
+  const [catatDariPin, setCatatDariPin] = useState(false)
   const [simpanSibuk, setSimpanSibuk] = useState(false)
   const [pesan, setPesan] = useState<string | null>(null)
   const [antre, setAntre] = useState(0)
@@ -411,6 +420,7 @@ export default function Aplikasi() {
         const j = (await r.json()) as Info
         // Koordinat yang disimpan tetap titik KAPTEN, bukan pusat petak.
         setModeNilai('catat')
+        setCatatDariPin(pin !== null)
         setMenilai({ ...j, lat: t.lat, lon: t.lon })
         return
       }
@@ -419,6 +429,7 @@ export default function Aplikasi() {
     }
     // Di luar wilayah terhitung: catat tanpa perkiraan model.
     setModeNilai('catat')
+    setCatatDariPin(pin !== null)
     setMenilai({
       id: `TITIK-${t.lat.toFixed(4)},${t.lon.toFixed(4)}`,
       level: 'titik',
@@ -489,17 +500,45 @@ export default function Aplikasi() {
       skorModel: menilai.level === 'titik' ? null : menilai.skor,
       kelasModel: menilai.level === 'titik' ? null : menilai.kelas,
       risikoModel: menilai.risiko,
-      lat: posisi?.lat ?? null,
-      lon: posisi?.lon ?? null,
+      // Koordinat yang dicatat adalah koordinat yang catatan ini BICARAKAN,
+      // bukan selalu posisi GPS.
+      //
+      // Di Pencatatan Manual kapten boleh menandai titik di peta — misalnya
+      // mengingat lokasi yang dilewati tadi. Sebelumnya `posisi` yang
+      // terkirim, jadi peta menggambar pin di satu titik sementara basis data
+      // menerima titik lain. Catatan "ada ikan di sini" jadi menunjuk tempat
+      // yang salah, dan tidak ada apa pun di data yang menunjukkan hal itu
+      // terjadi.
+      //
+      // `menilai.lat/lon` sudah berisi pin bila ada, posisi GPS bila tidak.
+      lat: modeNilai === 'catat' ? menilai.lat : (posisi?.lat ?? null),
+      lon: modeNilai === 'catat' ? menilai.lon : (posisi?.lon ?? null),
       tibaPada: new Date().toISOString(),
       // `catat` dilaporkan ke basis data sebagai `manual` — itu nama yang
       // dipakai spesifikasi tabel; `catat` hanya nama mode di layar.
       mode: modeNilai === 'catat' ? 'manual' : modeNilai,
-      // Mode manual tidak diperiksa posisinya — titiknya memang posisi
-      // kapten sendiri, jadi `posisi_cocok` dibiarkan null daripada diisi
-      // `true` yang menyiratkan ada pemeriksaan yang sebenarnya tidak terjadi.
-      posisiCocok: modeNilai === 'catat' ? null : posisiCocok,
-      jarakKePetakKm: modeNilai === 'catat' ? null : jarakKePetakKm,
+      // `posisi_cocok` berarti satu hal yang sama di ketiga mode: apakah
+      // koordinat yang dicatat memang tempat kapten berada.
+      //
+      //  - rekomendasi/eksplorasi : GPS berada di dalam petak yang dinilai
+      //  - manual tanpa pin       : true, koordinatnya memang GPS-nya sendiri
+      //  - manual dengan pin      : false, ia menandai tempat lain
+      //  - GPS mati               : null, tidak ada yang bisa diperiksa
+      //
+      // Jarak untuk mode manual adalah jarak GPS ke titik yang ditandai —
+      // ukuran seberapa jauh catatan itu dari tempat kapten sebenarnya.
+      posisiCocok:
+        modeNilai === 'catat'
+          ? posisi
+            ? !catatDariPin
+            : null
+          : posisiCocok,
+      jarakKePetakKm:
+        modeNilai === 'catat'
+          ? posisi
+            ? jarakKm(posisi, { lat: menilai.lat, lon: menilai.lon })
+            : null
+          : jarakKePetakKm,
       perangkat: idPerangkat(),
       ...isi,
     })

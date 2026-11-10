@@ -19,9 +19,9 @@ Tiga hal inti, dan ketiganya harus ada bersama-sama supaya catatannya berguna:
 
 | | Kolom | Kenapa |
 |---|---|---|
-| **Lokasi** | `lat`, `lon` | Koordinat GPS tempat kapten benar-benar berada — bukan pusat petak. Kapal tidak berhenti tepat di tengah heksagon. |
+| **Lokasi** | `lat`, `lon` | Koordinat yang catatan ini bicarakan — **bukan** pusat petak. Pada mode Rekomendasi/Eksplorasi: posisi GPS kapten. Pada Pencatatan Manual: titik yang ia tandai, yang bisa saja bukan posisinya sendiri. |
 | **Waktu** | `tiba_pada`, `dibuat_pada` | `tiba_pada` = saat kapten di lokasi; `dibuat_pada` = saat baris masuk basis data. Keduanya berbeda saat catatan dibuat offline lalu dikirim belakangan. |
-| **Zona heksagon** | `cell_key`, `cell_level` | Petak tempat koordinat itu jatuh. `coarse` = heksagon besar (±2.360 km²), `fine` = petak 2 km. Inilah yang menyambungkan catatan kapten ke perkiraan model. |
+| **Zona heksagon** | `cell_key`, `cell_level` | Petak tempat koordinat itu jatuh. `coarse` = heksagon besar (±2.360 km²), `fine` = petak 2 km, `titik` = di luar grid model. Inilah yang menyambungkan catatan kapten ke perkiraan model. |
 
 Di sekitar ketiganya ada tiga kelompok pendukung:
 
@@ -43,7 +43,21 @@ menjawab "di mana persisnya ikan itu ada", `cell_key` menjawab "model menduga
 apa di sana". Menyimpan salah satunya saja membuang separuh gunanya.
 
 Selisih keduanya juga data: `jarak_ke_petak_km` memberi tahu seberapa jauh
-kapten dari pusat petak yang ia nilai.
+kapten dari koordinat yang ia catat.
+
+### Catatan manual boleh menunjuk tempat lain
+
+Di Pencatatan Manual kapten bisa menandai titik di peta — misalnya mengingat
+lokasi yang dilewati tadi. Dalam hal itu `lat`/`lon` adalah titik yang
+**ditandai**, bukan posisinya saat mencatat, dan `posisi_cocok = false`
+menandainya. Catatan semacam itu tetap berharga, hanya harus ditimbang lebih
+ringan daripada catatan yang dibuat di tempat.
+
+```sql
+-- Catatan manual yang benar-benar dibuat di lokasi.
+SELECT * FROM kapten.validasi
+ WHERE mode = 'manual' AND posisi_cocok;
+```
 
 ## DDL
 
@@ -65,7 +79,7 @@ CREATE TABLE IF NOT EXISTS kapten.validasi (
   wpp_code          text NOT NULL,
   target_key        text NOT NULL,          -- 'kecil' | 'besar'
   cell_key          text NOT NULL,          -- mis. 'Z-712-0169'
-  cell_level        text,                   -- 'coarse' | 'fine'
+  cell_level        text,                   -- 'coarse' | 'fine' | 'titik'
   skor_model        numeric,                -- indeks prioritas 0–100 saat itu
   kelas_model       text,                   -- 'utama' | 'ekspedisi' | 'cadangan'
   risiko_model      text,                   -- 'aman' | 'waspada' | 'bahaya'
@@ -94,8 +108,17 @@ CREATE TABLE IF NOT EXISTS kapten.validasi (
   -- `false` bukan berarti catatannya salah; ia berarti catatan itu harus
   -- ditimbang lebih ringan. Analisis bisa menyaring `WHERE posisi_cocok`
   -- untuk mendapat himpunan yang paling bisa dipercaya.
-  posisi_cocok      boolean,                -- GPS berada di dalam petaknya
-  jarak_ke_petak_km numeric,                -- jarak GPS ke pusat petak
+  -- `posisi_cocok` berarti satu hal yang sama di ketiga mode: apakah
+  -- koordinat yang dicatat memang tempat kapten berada.
+  --
+  --   rekomendasi / eksplorasi : GPS berada di dalam petak yang dinilai
+  --   manual tanpa pin         : true  — koordinatnya memang GPS-nya sendiri
+  --   manual dengan pin        : false — ia menandai tempat lain
+  --   GPS mati                 : null  — tidak ada yang bisa diperiksa
+  posisi_cocok      boolean,
+  -- Jarak GPS ke koordinat yang dicatat. Pada mode petak ini jarak ke pusat
+  -- petak; pada manual, jarak ke titik yang ditandai.
+  jarak_ke_petak_km numeric,
 
   -- ===== Penilaian kapten =====
   setuju            boolean NOT NULL,       -- setuju area ini banyak ikan?
