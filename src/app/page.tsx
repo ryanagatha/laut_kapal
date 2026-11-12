@@ -709,7 +709,7 @@ export default function Aplikasi() {
       {/* ---- kendali kanan ---- */}
       <div
         className="pointer-events-none absolute right-3 z-20 flex flex-col items-end gap-2"
-        style={{ top: 'calc(var(--aman-atas) + 118px)' }}
+        style={{ top: 'calc(var(--aman-atas) + 158px)' }}
       >
         {/* Tombol kendali DI ATAS panel iklim.
             Panel iklim kini terbuka sejak awal dan tingginya berubah-ubah;

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Cloud } from 'lucide-react'
 
 /**
  * Panel iklim melayang — ringkasan kondisi SELURUH wilayah, bukan satu petak.
@@ -70,12 +71,10 @@ export function PanelIklim({
   /** Petak yang sedang dipilih — jadi keterangan asal cuaca live. */
   namaPetak?: string | null
 }) {
-  // Terbuka sejak awal. Panel ini menjawab "boleh melaut hari ini atau
-  // tidak", dan jawaban itu tidak boleh bersembunyi di balik satu ketukan —
-  // pada WPP 573 hari ini 3.626 dari 5.150 petak berstatus waspada dengan
-  // ombak sampai 2,13 m, dan kapten yang tidak membuka panel tidak akan
-  // pernah melihatnya. Tetap bisa dilipat kalau menutupi peta.
-  const [buka, setBuka] = useState(true)
+  // Diminimalkan sejak awal agar peta tidak tertutup. Saat diciutkan, panel
+  // menjadi tombol kecil yang titik warnanya tetap menunjukkan status risiko
+  // terburuk, jadi kapten tetap melihat peringatan tanpa membuka panel.
+  const [buka, setBuka] = useState(false)
 
   const ombak = kelasOmbak(data?.ombakMaksM ?? null)
   const angin = kelasAngin(data?.anginMaksKn ?? null)
@@ -88,6 +87,26 @@ export function PanelIklim({
         ? { label: 'Sebagian perlu waspada', warna: '#eab308' }
         : { label: 'Seluruh wilayah aman', warna: '#16a34a' }
     : { label: 'Memuat…', warna: '#94a3b8' }
+
+  if (!buka) {
+    return (
+      <div className="pointer-events-auto flex justify-end">
+        <button
+          onClick={() => setBuka(true)}
+          className="box-cut kaca tekan relative flex h-8 w-8 items-center justify-center"
+          aria-label="Buka panel cuaca"
+          aria-expanded={false}
+          title={`${namaPetak ? 'Cuaca petak ini' : 'Cuaca wilayah'} · ${buruk.label}`}
+        >
+          <Cloud size={16} className="text-[var(--navy)]" />
+          <span
+            className="absolute right-1 top-1 h-2 w-2 rounded-full"
+            style={{ background: buruk.warna }}
+          />
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="pointer-events-auto w-[168px]">
@@ -108,16 +127,6 @@ export function PanelIklim({
         </div>
         <p className="mt-0.5 text-[9px] leading-snug text-zinc-600">{buruk.label}</p>
 
-        {!buka && data && (
-          <div className="mt-1.5 flex gap-2 text-[9px] text-zinc-600">
-            <span>
-              Ombak <b className="text-[var(--navy)]">{data.ombakMaksM?.toFixed(1) ?? '—'} m</b>
-            </span>
-            <span>
-              Angin <b className="text-[var(--navy)]">{Math.round(data.anginMaksKn ?? 0) || '—'} kn</b>
-            </span>
-          </div>
-        )}
       </button>
 
       {buka && (
